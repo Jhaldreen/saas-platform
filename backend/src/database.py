@@ -1,14 +1,24 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-from config import DATABASE_URL
+from typing import Generator
+from .config import settings
 
-engine = create_engine(DATABASE_URL)
+# Create database engine
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    echo=settings.DEBUG
+)
+
+# Create SessionLocal class
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+# Base class for models
 Base = declarative_base()
 
-def get_db() -> Session:
+# Dependency to get DB session
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db

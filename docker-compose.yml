@@ -42,7 +42,10 @@ services:
       postgres:
         condition: service_healthy
     volumes:
+      # Monta solo el código fuente para hot reload
       - ./backend/src:/app/src
+      # Excluye __pycache__ del host
+      - /app/src/__pycache__
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
     deploy:
@@ -56,11 +59,11 @@ services:
     networks:
       - saas-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 
   frontend:
     build:
@@ -74,7 +77,11 @@ services:
     depends_on:
       - backend
     volumes:
+      # Monta solo src y public para hot reload
       - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      # CRÍTICO: Previene que node_modules local sobrescriba el del contenedor
+      - /app/node_modules
     restart: unless-stopped
     deploy:
       resources:

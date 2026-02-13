@@ -1,23 +1,36 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
+from uuid import UUID
+
+from ..models.user import UserRole
 
 class UserBase(BaseModel):
-    email: str
-    role: str
+    email: EmailStr
+    role: UserRole = UserRole.MEMBER
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    role: UserRole = UserRole.MEMBER
+
+class UserLogin(BaseModel):
+    email: EmailStr
     password: str
 
-class UserUpdate(UserBase):
-    password: Optional[str] = None
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    role: Optional[UserRole] = None
 
-class UserInDB(UserBase):
-    id: int
+class UserResponse(UserBase):
+    id: UUID
     created_at: datetime
-
+    
     class Config:
-        orm_mode = True
+        from_attributes = True
 
-class User(UserInDB):
-    pass
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: UserResponse

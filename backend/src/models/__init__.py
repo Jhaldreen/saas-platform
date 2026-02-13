@@ -1,3 +1,17 @@
-# backend/src/models/__init__.py
+from .user import User, UserRole
+from .organization import Organization
+from .audit import Audit, AuditType, AuditStatus
+from .rule import Rule, RuleSeverity
+from .finding import Finding
 
-# This file is intentionally left blank.
+__all__ = [
+    "User",
+    "UserRole",
+    "Organization",
+    "Audit",
+    "AuditType",
+    "AuditStatus",
+    "Rule",
+    "RuleSeverity",
+    "Finding",
+]
