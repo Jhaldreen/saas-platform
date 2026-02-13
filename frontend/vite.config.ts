@@ -11,8 +11,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    open: true,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    open: false,  // Deshabilitado para Docker
+    watch: {
+      usePolling: true  // Para hot reload en Docker
+    }
   },
   build: {
     outDir: 'dist',

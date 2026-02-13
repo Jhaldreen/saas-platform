@@ -1,20 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.src.api.v1 import api_router
-from backend.src.config import settings
 
-app = FastAPI()
+app = FastAPI(
+    title="SaaS Platform API",
+    description="Multi-tenant SaaS Platform Backend",
+    version="1.0.0"
+)
 
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOW_ORIGINS,
+    allow_origins=["http://localhost:5173", "http://frontend:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(api_router, prefix="/api/v1")
-
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to the SaaS Platform API!"}
+async def root():
+    return {"message": "Welcome to SaaS Platform API"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+@app.get("/docs")
+async def docs_redirect():
+    return {"message": "API documentation available at /docs"}
