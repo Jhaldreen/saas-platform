@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy dependency files
 COPY package.json package-lock.json* ./
 
-# Install dependencies (ci is preferred in Docker for production)
-RUN npm ci
+# Install all dependencies (including dev deps for build)
+RUN npm install
 
 # Copy source code
 COPY . .
@@ -15,20 +15,20 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Runtime stage - using lightweight nginx to serve the built app
+# Runtime stage
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
+# Create non-root user for security (use different uid to avoid conflicts)
+RUN addgroup -g 1001 appuser && adduser -D -u 1001 -G appuser appuser
 
 # Copy built application from builder
 COPY --from=builder --chown=appuser:appuser /app/dist ./dist
 COPY --from=builder /app/package.json ./
 
 # Install only production dependencies for preview server
-RUN npm ci --omit=dev
+RUN npm install --production
 
 # Switch to non-root user
 USER appuser
