@@ -115,3 +115,23 @@ class FindingResponseDTO(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Organization List Response
+class OrganizationListResponse(BaseModel):
+    organizations: List[OrganizationResponseDTO]
+    total: int
+
+# Audit List Response
+class AuditListResponse(BaseModel):
+    audits: List[AuditResponseDTO]
+    total: int
+
+# Finding List Response
+class FindingListResponse(BaseModel):
+    findings: List[FindingResponseDTO]
+    total: int
+
+# Rule List Response
+class RuleListResponse(BaseModel):
+    rules: List[RuleResponseDTO]
+    total: int

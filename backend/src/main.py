@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .infrastructure.database import init_db
-from .infrastructure.api.routes import auth
+from .infrastructure.api.routes import auth, organizations, audits, rules, dashboard
 
 # Initialize database
 init_db()
@@ -10,7 +10,7 @@ init_db()
 # Create FastAPI app
 app = FastAPI(
     title="AI Cloud Cost Auditor - Hexagonal Architecture",
-    description="Multi-tenant SaaS with Clean Architecture",
+    description="Multi-tenant SaaS with Clean Architecture - Complete API",
     version="1.0.0"
 )
 
@@ -23,14 +23,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
+# Include all routers
 app.include_router(auth.router)
-
-# NOTE: Add more routers here:
-# from .infrastructure.api.routes import organizations, audits, rules
-# app.include_router(organizations.router)
-# app.include_router(audits.router)
-# app.include_router(rules.router)
+app.include_router(organizations.router)
+app.include_router(audits.router)
+app.include_router(rules.router)
+app.include_router(dashboard.router)
 
 
 @app.get("/")
@@ -38,7 +36,14 @@ async def root():
     return {
         "message": "AI Cloud Cost Auditor API - Hexagonal Architecture",
         "version": "1.0.0",
-        "architecture": "Clean/Hexagonal"
+        "architecture": "Clean/Hexagonal",
+        "endpoints": {
+            "auth": "/auth",
+            "organizations": "/organizations",
+            "audits": "/audits",
+            "rules": "/rules",
+            "dashboard": "/dashboard"
+        }
     }
 
 

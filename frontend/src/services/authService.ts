@@ -1,18 +1,37 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000/api/v1/auth'; // Adjust the URL as needed
+const API_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
-export const login = async (email: string, password: string) => {
-    const response = await axios.post(`${API_URL}/login`, { email, password });
-    return response.data;
+interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+  };
+}
+
+export const login = async (email: string, password: string): Promise<LoginResponse> => {
+  const response = await axios.post(`${API_URL}/auth/login`, { email, password });
+  return response.data;
 };
 
-export const register = async (email: string, password: string) => {
-    const response = await axios.post(`${API_URL}/register`, { email, password });
-    return response.data;
+export const register = async (email: string, password: string, role: string = 'member'): Promise<LoginResponse> => {
+  const response = await axios.post(`${API_URL}/auth/register`, { email, password, role });
+  return response.data;
+};
+
+export const getCurrentUser = async (token: string) => {
+  const response = await axios.get(`${API_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
 };
 
 export const logout = async () => {
-    // Implement logout logic if needed
-    localStorage.removeItem('token');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
 };
