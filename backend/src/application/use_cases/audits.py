@@ -1,44 +1,19 @@
-# Remaining use cases - can be expanded similarly
-
 from uuid import uuid4, UUID
 from datetime import datetime
 from typing import List
 
-from ...domain.entities import Organization, Audit, Rule, Finding
-from ...domain.entities.audit import AuditType, AuditStatus
-from ...domain.repositories import (
-    OrganizationRepository,
-    AuditRepository,
-    RuleRepository,
-    FindingRepository
-)
+from ...domain.entities.audit import Audit, AuditType, AuditStatus
+from ...domain.entities.finding import Finding
+from ...domain.repositories.audit_repository import AuditRepository
+from ...domain.repositories.finding_repository import FindingRepository
+from ...domain.repositories.rule_repository import RuleRepository
 from ...domain.services.audit_service import AuditService
-from ...domain.exceptions import EntityNotFoundError, UnauthorizedError
-
-
-class CreateOrganizationUseCase:
-    def __init__(self, org_repository: OrganizationRepository):
-        self.org_repository = org_repository
-    
-    async def execute(self, name: str, owner_id: UUID) -> Organization:
-        org = Organization(
-            id=uuid4(),
-            name=name,
-            owner_id=owner_id,
-            created_at=datetime.utcnow()
-        )
-        return await self.org_repository.create(org)
-
-
-class GetUserOrganizationsUseCase:
-    def __init__(self, org_repository: OrganizationRepository):
-        self.org_repository = org_repository
-    
-    async def execute(self, owner_id: UUID) -> List[Organization]:
-        return await self.org_repository.get_by_owner(owner_id)
+from ...domain.exceptions import EntityNotFoundError
 
 
 class CreateAuditUseCase:
+    """Use case: Create a new audit"""
+    
     def __init__(self, audit_repository: AuditRepository):
         self.audit_repository = audit_repository
     
@@ -63,8 +38,31 @@ class CreateAuditUseCase:
         return await self.audit_repository.create(audit)
 
 
+class GetAuditsByOrganizationUseCase:
+    """Use case: Get all audits for an organization"""
+    
+    def __init__(self, audit_repository: AuditRepository):
+        self.audit_repository = audit_repository
+    
+    async def execute(self, organization_id: UUID) -> List[Audit]:
+        return await self.audit_repository.get_by_organization(organization_id)
+
+
+class GetAuditByIdUseCase:
+    """Use case: Get audit by ID"""
+    
+    def __init__(self, audit_repository: AuditRepository):
+        self.audit_repository = audit_repository
+    
+    async def execute(self, audit_id: UUID) -> Audit:
+        audit = await self.audit_repository.get_by_id(audit_id)
+        if not audit:
+            raise EntityNotFoundError("Audit", str(audit_id))
+        return audit
+
+
 class ProcessAuditUseCase:
-    """Process audit with CSV data and rules"""
+    """Use case: Process audit with CSV data and rules"""
     
     def __init__(
         self,
@@ -116,38 +114,9 @@ class ProcessAuditUseCase:
         return await self.audit_repository.update(audit)
 
 
-class CreateRuleUseCase:
-    def __init__(self, rule_repository: RuleRepository):
-        self.rule_repository = rule_repository
-    
-    async def execute(
-        self,
-        organization_id: UUID,
-        name: str,
-        audit_type: str,
-        conditions: dict,
-        severity: str,
-        created_by: UUID,
-        description: str = None
-    ) -> Rule:
-        from ...domain.entities.rule import RuleSeverity
-        
-        rule = Rule(
-            id=uuid4(),
-            organization_id=organization_id,
-            name=name,
-            audit_type=audit_type,
-            conditions=conditions,
-            severity=RuleSeverity(severity),
-            is_active=True,
-            created_by=created_by,
-            created_at=datetime.utcnow(),
-            description=description
-        )
-        return await self.rule_repository.create(rule)
-
-
 class GetAuditFindingsUseCase:
+    """Use case: Get all findings for an audit"""
+    
     def __init__(self, finding_repository: FindingRepository):
         self.finding_repository = finding_repository
     
