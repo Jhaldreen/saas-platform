@@ -1,29 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import Optional
+from datetime import datetime
 import os
+import pandas as pd
 
 from ....application.dto import AuditResponseDTO, AuditListResponse, FindingListResponse, FindingResponseDTO
-from ....application.use_cases import (
-    CreateAuditUseCase,
-    GetAuditFindingsUseCase
-)
-from ....domain.entities import User, AuditType
-from ....domain.repositories import AuditRepository, OrganizationRepository
+from ....application.use_cases import CreateAuditUseCase, GetAuditFindingsUseCase
+from ....domain.entities import User, AuditType, AuditStatus
+from ....domain.entities.finding import Finding
+from ....domain.repositories import AuditRepository, OrganizationRepository, RuleRepository, FindingRepository
 from ....domain.exceptions import EntityNotFoundError
 from ..dependencies import (
     get_create_audit_use_case,
     get_audit_findings_use_case,
     get_current_user,
     get_audit_repository,
-    get_organization_repository
+    get_organization_repository,
+    get_rule_repository,
+    get_finding_repository
 )
 
 router = APIRouter(prefix="/audits", tags=["Audits"])
 
-# File upload configuration
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".csv", ".xlsx"}
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -36,22 +37,17 @@ async def upload_audit(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     use_case: CreateAuditUseCase = Depends(get_create_audit_use_case),
-    org_repository: OrganizationRepository = Depends(get_organization_repository)
+    org_repository: OrganizationRepository = Depends(get_organization_repository),
+    audit_repository: AuditRepository = Depends(get_audit_repository),
+    rule_repository: RuleRepository = Depends(get_rule_repository),
+    finding_repository: FindingRepository = Depends(get_finding_repository)
 ):
-    """
-    Upload a CSV file for audit analysis
+    """Upload a CSV file for audit analysis and process immediately"""
     
-    - **organization_id**: UUID of the organization
-    - **audit_type**: Type of audit (cloud, hospitality, business)
-    - **file**: CSV file to analyze
-    """
     # Verify organization ownership
     org = await org_repository.get_by_id(organization_id)
     if not org or org.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Organization not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
     
     # Validate file extension
     file_ext = os.path.splitext(file.filename)[1].lower()
@@ -93,7 +89,70 @@ async def upload_audit(
             created_by=current_user.id
         )
         
+        # PROCESS IMMEDIATELY
+        try:
+            # Read CSV
+            df = pd.read_csv(file_path)
+            csv_data = df.to_dict('records')
+            
+            # Mark as processing
+            audit.status = AuditStatus.PROCESSING
+            await audit_repository.update(audit)
+            
+            # Get active rules
+            rules = await rule_repository.get_active_by_audit_type(
+                audit.organization_id,
+                audit.audit_type.value
+            )
+            
+            # Process data
+            findings = []
+            total_cost = 0.0
+            
+            for row in csv_data:
+                for rule in rules:
+                    # Evaluate rule
+                    if rule.evaluate(row):
+                        finding = Finding(
+                            id=uuid4(),
+                            audit_id=audit.id,
+                            rule_id=rule.id,
+                            title=f"{rule.name}",
+                            severity=rule.severity,
+                            description=rule.description or f"Issue detected by rule: {rule.name}",
+                            evidence=row,
+                            recommendation=f"Please review and address this finding based on rule criteria",
+                            created_at=datetime.utcnow()
+                        )
+                        
+                        # Try to get cost impact
+                        cost_field = rule.conditions.get('field', 'cost')
+                        if cost_field in row:
+                            try:
+                                finding.cost_impact = float(row[cost_field])
+                                total_cost += finding.cost_impact
+                            except:
+                                pass
+                        
+                        findings.append(finding)
+                        await finding_repository.create(finding)
+            
+            # Calculate optimization score (0-100)
+            severity_weights = {'low': 2, 'medium': 5, 'high': 10, 'critical': 15}
+            penalty = sum(severity_weights.get(f.severity.value, 5) for f in findings)
+            score = max(0, min(100, 100 - penalty))
+            
+            # Update audit
+            audit.mark_as_completed(score, total_cost if total_cost > 0 else None)
+            audit = await audit_repository.update(audit)
+            
+        except Exception as e:
+            # Mark as failed
+            audit.mark_as_failed(str(e))
+            await audit_repository.update(audit)
+        
         return AuditResponseDTO.from_orm(audit)
+        
     except Exception as e:
         # Clean up file if audit creation fails
         if os.path.exists(file_path):
@@ -108,28 +167,18 @@ async def list_audits(
     audit_repository: AuditRepository = Depends(get_audit_repository),
     org_repository: OrganizationRepository = Depends(get_organization_repository)
 ):
-    """
-    List all audits for user's organizations
-    
-    Optionally filter by organization_id
-    """
-    # Get user's organizations
+    """List all audits for user's organizations"""
     user_orgs = await org_repository.get_by_owner(current_user.id)
     user_org_ids = [org.id for org in user_orgs]
     
     if not user_org_ids:
         return AuditListResponse(audits=[], total=0)
     
-    # Filter by specific organization if provided
     if organization_id:
         if organization_id not in user_org_ids:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Organization not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found")
         audits = await audit_repository.get_by_organization(organization_id)
     else:
-        # Get audits from all user's organizations
         all_audits = []
         for org_id in user_org_ids:
             org_audits = await audit_repository.get_by_organization(org_id)
@@ -149,24 +198,15 @@ async def get_audit(
     audit_repository: AuditRepository = Depends(get_audit_repository),
     org_repository: OrganizationRepository = Depends(get_organization_repository)
 ):
-    """
-    Get details of a specific audit
-    """
+    """Get details of a specific audit"""
     audit = await audit_repository.get_by_id(audit_id)
     
     if not audit:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audit not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found")
     
-    # Verify user owns the organization
     org = await org_repository.get_by_id(audit.organization_id)
     if not org or org.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audit not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found")
     
     return AuditResponseDTO.from_orm(audit)
 
@@ -179,29 +219,16 @@ async def get_audit_findings(
     audit_repository: AuditRepository = Depends(get_audit_repository),
     org_repository: OrganizationRepository = Depends(get_organization_repository)
 ):
-    """
-    Get all findings for a specific audit
-    
-    Returns list of issues/problems found during the audit.
-    """
-    # Verify audit exists and user has access
+    """Get all findings for a specific audit"""
     audit = await audit_repository.get_by_id(audit_id)
     
     if not audit:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audit not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found")
     
-    # Verify user owns the organization
     org = await org_repository.get_by_id(audit.organization_id)
     if not org or org.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Audit not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Audit not found")
     
-    # Get findings
     findings = await use_case.execute(audit_id=audit_id)
     
     return FindingListResponse(
