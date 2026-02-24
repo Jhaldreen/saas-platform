@@ -10,6 +10,7 @@ import OrganizationsPage from './pages/OrganizationsPage';
 import AuditsPage from './pages/AuditsPage';
 import RulesPage from './pages/RulesPage';
 import SettingsPage from './pages/SettingsPage';
+import AuditDetailsPage from './pages/AuditDetailsPage';
 
 const App: React.FC = () => {
   return (
@@ -25,6 +26,7 @@ const App: React.FC = () => {
             <Route path="/audits" element={<PrivateRoute><AuditsPage /></PrivateRoute>} />
             <Route path="/rules" element={<PrivateRoute><RulesPage /></PrivateRoute>} />
             <Route path="/settings" element={<PrivateRoute><SettingsPage /></PrivateRoute>} />
+            <Route path="/audits/:id" element={<PrivateRoute><AuditDetailsPage /></PrivateRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

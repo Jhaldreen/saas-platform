@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { auditService } from '../services/auditService';
 import { organizationService } from '../services/organizationService';
 import { Audit, Organization } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 const AuditsPage: React.FC = () => {
   const [audits, setAudits] = useState<Audit[]>([]);
@@ -12,6 +13,7 @@ const AuditsPage: React.FC = () => {
   const [auditType, setAuditType] = useState('cloud');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => { loadData(); }, []);
 
@@ -52,7 +54,7 @@ const AuditsPage: React.FC = () => {
       pending: { background: '#fef3c7', color: '#92400e' },
       failed: { background: '#fee2e2', color: '#991b1b' }
     };
-    return <span style={{...s.badge, ...styles[status]}}>{status.toUpperCase()}</span>;
+    return <span style={{ ...s.badge, ...styles[status] }}>{status.toUpperCase()}</span>;
   };
 
   if (loading) return <div style={s.loading}><div style={s.spinner}></div></div>;
@@ -70,10 +72,10 @@ const AuditsPage: React.FC = () => {
       {audits.length === 0 ? (
         <div style={s.empty}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={s.emptyIcon}>
-            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2"/>
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" strokeWidth="2" />
           </svg>
           <h3>No audits yet</h3>
-          <p style={{color: '#64748b'}}>Upload a CSV file to start auditing</p>
+          <p style={{ color: '#64748b' }}>Upload a CSV file to start auditing</p>
         </div>
       ) : (
         <div style={s.tableContainer}>
@@ -89,7 +91,11 @@ const AuditsPage: React.FC = () => {
             </thead>
             <tbody>
               {audits.map(audit => (
-                <tr key={audit.id} style={s.tr}>
+                <tr
+                  key={audit.id}
+                  style={{ ...s.tr, cursor: 'pointer' }}
+                  onClick={() => navigate(`/audits/${audit.id}`)}
+                >
                   <td style={s.td}>{audit.file_name}</td>
                   <td style={s.td}><span style={s.typeBadge}>{audit.audit_type}</span></td>
                   <td style={s.td}>{getStatusBadge(audit.status)}</td>

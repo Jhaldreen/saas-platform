@@ -61,5 +61,13 @@ export const auditService = {
       getAuthHeaders()
     );
     return response.data;
+  },
+
+  async getData(auditId: string) {
+    const response = await axios.get(
+      `${API_URL}/audits/${auditId}/data`,
+      getAuthHeaders()
+    );
+    return response.data;
   }
 };

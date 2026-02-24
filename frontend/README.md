@@ -21,21 +21,22 @@ This is the frontend part of the multi-tenant SaaS platform built using React 18
 1. **Clone the repository**:
    ```
    git clone <repository-url>
-   cd saas-platform/frontend
+   cd saas-platform
    ```
 
 2. **Install dependencies**:
    ```
    npm install
+   npm install recharts
    ```
 
 3. **Run the application**:
    ```
-   npm run dev
+   docker compose -f 'docker-compose.yml' up -d --build 
    ```
 
 4. **Open your browser**:
-   Navigate to `http://localhost:3000` to view the application.
+   Navigate to `http://localhost:5173` to view the application.
 
 ## Features
 

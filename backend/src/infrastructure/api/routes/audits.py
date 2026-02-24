@@ -235,3 +235,25 @@ async def get_audit_findings(
         findings=[FindingResponseDTO.from_orm(finding) for finding in findings],
         total=len(findings)
     )
+
+@router.get("/{audit_id}/data")
+async def get_audit_data(
+    audit_id: UUID,
+    current_user: User = Depends(get_current_user),
+    audit_repository: AuditRepository = Depends(get_audit_repository),
+    org_repository: OrganizationRepository = Depends(get_organization_repository)
+):
+    
+    audit = await audit_repository.get_by_id(audit_id)
+    if not audit:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    
+    org = await org_repository.get_by_id(audit.organization_id)
+    if not org or org.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Audit not found")
+    
+    if not os.path.exists(audit.file_path):
+        raise HTTPException(status_code=404, detail="CSV file not found")
+    
+    df = pd.read_csv(audit.file_path)
+    return {"data": df.to_dict('records'), "columns": list(df.columns)}
